@@ -18,14 +18,14 @@ function start() {
         if (n.repeat_interval_min) {
           db.prepare(`
             UPDATE notifications
-            SET last_sent_at = datetime('now'),
-                next_fire_at = datetime('now', '+' || ? || ' minutes')
+            SET last_sent_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
+                next_fire_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+' || ? || ' minutes')
             WHERE id = ?
           `).run(n.repeat_interval_min, n.id);
         } else {
           db.prepare(`
             UPDATE notifications
-            SET status = 'sent', last_sent_at = datetime('now')
+            SET status = 'sent', last_sent_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
             WHERE id = ?
           `).run(n.id);
         }

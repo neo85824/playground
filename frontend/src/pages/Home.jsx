@@ -23,7 +23,11 @@ const PRIORITY_COLOR = {
 
 function formatDate(iso) {
   if (!iso) return '-';
-  return new Date(iso).toLocaleString('en-US', {
+  // Normalize SQLite space-format to ISO with Z so browsers parse it as UTC
+  const normalized = /^\d{4}-\d{2}-\d{2} /.test(iso) ? iso.replace(' ', 'T') + 'Z' : iso;
+  const d = new Date(normalized);
+  if (isNaN(d)) return '-';
+  return d.toLocaleString('en-US', {
     timeZone: 'Asia/Taipei',
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
