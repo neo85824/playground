@@ -14,12 +14,19 @@ const REPEAT_PRESETS = [
   { label: 'Daily', value: 1440 },
 ];
 
+const TZ = 'Asia/Taipei';
+
 function toLocalDatetimeValue(isoOrDatetime) {
   if (!isoOrDatetime) return '';
   const d = new Date(isoOrDatetime);
   if (isNaN(d)) return '';
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(d);
+  const get = (type) => parts.find(p => p.type === type)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
 }
 
 export default function NotificationForm({ initial, onSubmit, onClose }) {
