@@ -39,6 +39,9 @@ router.patch('/:id', (req, res) => {
 
   const { title, message, scheduled_at, repeat_interval_min, priority } = req.body;
   const newScheduled = scheduled_at ?? n.scheduled_at;
+  // Only reset next_fire_at when scheduled_at explicitly changes — otherwise keep
+  // the current next_fire_at so repeating intervals aren't disrupted
+  const newNextFire = scheduled_at !== undefined ? scheduled_at : n.next_fire_at;
 
   db.prepare(`
     UPDATE notifications
@@ -46,12 +49,12 @@ router.patch('/:id', (req, res) => {
         priority = ?, next_fire_at = ?, status = 'pending'
     WHERE id = ?
   `).run(
-    title !== undefined ? title : n.title,
+    title !== undefined ? (title || null) : n.title,
     message ?? n.message,
     newScheduled,
     repeat_interval_min !== undefined ? (repeat_interval_min || null) : n.repeat_interval_min,
     priority !== undefined ? priority : n.priority,
-    newScheduled,
+    newNextFire,
     req.params.id
   );
 
