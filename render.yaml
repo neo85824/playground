@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: notification-app
+    runtime: node
+    buildCommand: npm ci && cd frontend && npm ci && npm run build
+    startCommand: node backend/server.js
+    envVars:
+      - key: DB_PATH
+        value: /data/notifications.db
+      - key: DISCORD_CHANNEL_ID
+        value: "1505966182954700913"
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+    disk:
+      name: notification-data
+      mountPath: /data
+      sizeGB: 1
