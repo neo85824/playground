@@ -17,7 +17,6 @@ RUN npm ci --omit=dev
 
 # Copy backend and startup script
 COPY backend/ ./backend/
-COPY database/ ./database/
 COPY start.sh ./start.sh
 RUN chmod +x start.sh
 
