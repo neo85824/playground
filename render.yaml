@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: notification-app
+    name: playground
     runtime: node
-    buildCommand: npm ci && cd frontend && npm ci && npm run build && cd ../frontend-flashcard && npm ci && npm run build
-    startCommand: node backend/server.js
+    buildCommand: npm ci && cd apps/notifications/frontend && npm ci && npm run build && cd ../../flashcard/frontend && npm ci && npm run build
+    startCommand: node server/index.js
     envVars:
       - key: DB_PATH
         value: /data/notifications.db

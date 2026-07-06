@@ -1,10 +1,10 @@
 {
-  "name": "notification-app",
+  "name": "playground",
   "version": "1.0.0",
   "type": "commonjs",
   "scripts": {
-    "start": "node backend/server.js",
-    "dev": "concurrently \"nodemon backend/server.js\" \"cd frontend && npm run dev\"",
+    "start": "node server/index.js",
+    "dev": "concurrently \"nodemon server/index.js\" \"cd apps/notifications/frontend && npm run dev\"",
     "test": "jest --forceExit"
   },
   "dependencies": {

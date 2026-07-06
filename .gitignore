@@ -1,8 +1,8 @@
 node_modules/
-frontend/node_modules/
-frontend/dist/
-frontend-flashcard/node_modules/
-frontend-flashcard/dist/
+apps/notifications/frontend/node_modules/
+apps/notifications/frontend/dist/
+apps/flashcard/frontend/node_modules/
+apps/flashcard/frontend/dist/
 database/notifications.db
 database/notifications.db-shm
 database/notifications.db-wal

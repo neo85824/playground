@@ -5,4 +5,4 @@ if [ ! -f /data/flashcards.db ]; then
   echo "Seeding flashcards database from bundle..."
   cp /app/database/flashcards.db /data/flashcards.db
 fi
-exec node backend/server.js
+exec node server/index.js
