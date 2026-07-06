@@ -1,9 +1,13 @@
 node_modules/
 frontend/node_modules/
 frontend/dist/
+frontend-flashcard/node_modules/
+frontend-flashcard/dist/
 database/notifications.db
 database/notifications.db-shm
 database/notifications.db-wal
+database/flashcards.db-shm
+database/flashcards.db-wal
 .env
 *.log
 .git/

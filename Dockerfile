@@ -11,16 +11,24 @@ RUN cd frontend && npm ci
 COPY frontend/ ./frontend/
 RUN cd frontend && npm run build
 
+# Build flashcard frontend
+COPY frontend-flashcard/package*.json ./frontend-flashcard/
+RUN cd frontend-flashcard && npm ci
+
+COPY frontend-flashcard/ ./frontend-flashcard/
+RUN cd frontend-flashcard && npm run build
+
 # Install backend deps (better-sqlite3 needs native compile)
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy backend and startup script
+# Copy backend, seed DBs, and startup script
 COPY backend/ ./backend/
+COPY database/flashcards.db ./database/flashcards.db
 COPY start.sh ./start.sh
 RUN chmod +x start.sh
 
-RUN mkdir -p /data
+RUN mkdir -p /data backend/flashcard/uploads
 
 EXPOSE 3002
 
