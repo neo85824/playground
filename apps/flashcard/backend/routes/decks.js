@@ -131,8 +131,13 @@ router.get('/:id/export', (req, res) => {
     'word,translation',
     ...cards.map(c => `"${c.word.replace(/"/g, '""')}","${c.translation.replace(/"/g, '""')}"`)
   ].join('\n');
+  const safeName = deck.name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
+  const encodedName = encodeURIComponent(deck.name);
   res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="${deck.name.replace(/"/g, '')}.csv"`);
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${safeName}.csv"; filename*=UTF-8''${encodedName}.csv`
+  );
   res.send(csv);
 });
 
