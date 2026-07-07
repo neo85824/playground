@@ -8,7 +8,7 @@ import { loadSession, saveSession, clearSession } from '../lib/sessionStorage';
 
 const GRADES = [
   { quality: 1, label: 'Again',  sub: 'Forgot',       cls: 'border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' },
-  { quality: 2, label: 'Hard',   sub: 'Nearly',        cls: 'border-orange-200 dark:border-orange-800 text-orange-500 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20' },
+  { quality: 3, label: 'Hard',   sub: 'Nearly',        cls: 'border-orange-200 dark:border-orange-800 text-orange-500 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20' },
   { quality: 4, label: 'Good',   sub: 'Got it',        cls: 'border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' },
   { quality: 5, label: 'Easy',   sub: 'Too easy',      cls: 'border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20' },
 ];
@@ -101,7 +101,7 @@ export default function SpacedRepetitionMode() {
       if (e.key === ' ') { e.preventDefault(); setRevealed(r => !r); }
       if (revealed) {
         if (e.key === '1') grade(1);
-        if (e.key === '2') grade(2);
+        if (e.key === '2') grade(3);
         if (e.key === '3') grade(4);
         if (e.key === '4') grade(5);
       }
