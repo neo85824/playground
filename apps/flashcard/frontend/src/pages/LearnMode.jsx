@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getDeck, saveLearnResult } from '../api';
 import FlipCard from '../components/Card/FlipCard';
 import ProgressBar from '../components/Shared/ProgressBar';
+import { shuffleArray } from '../lib/shuffle';
+import { loadSession, saveSession, clearSession } from '../lib/sessionStorage';
 
 export default function LearnMode() {
   const { id } = useParams();
@@ -13,15 +15,63 @@ export default function LearnMode() {
   const [revealed, setRevealed] = useState(false);
   const [done, setDone] = useState(false);
   const [totalCards, setTotalCards] = useState(0);
+  const [shuffled, setShuffled] = useState(true);
+  const [originalOrder, setOriginalOrder] = useState([]);
+  const restored = useRef(false);
 
   useEffect(() => {
     getDeck(id).then((data) => {
       setDeckName(data.name);
-      const shuffled = [...data.cards].sort(() => Math.random() - 0.5);
-      setQueue(shuffled);
       setTotalCards(data.cards.length);
+      setOriginalOrder(data.cards);
+
+      const session = loadSession('learn', id);
+      const byId = new Map(data.cards.map((c) => [c.id, c]));
+      const queueIds = session?.queueIds;
+      const knownIds = session?.knownIds;
+      const canRestore = !session?.done
+        && Array.isArray(queueIds) && Array.isArray(knownIds)
+        && [...queueIds, ...knownIds].every((cardId) => byId.has(cardId))
+        && queueIds.length + knownIds.length === data.cards.length
+        && queueIds.length > 0;
+
+      if (canRestore) {
+        setQueue(queueIds.map((cardId) => byId.get(cardId)));
+        setKnown(knownIds.map((cardId) => byId.get(cardId)));
+        setShuffled(!!session.shuffled);
+      } else {
+        setQueue(shuffleArray(data.cards));
+        setKnown([]);
+        setShuffled(true);
+      }
+      restored.current = true;
     });
   }, [id]);
+
+  useEffect(() => {
+    if (!restored.current) return;
+    saveSession('learn', id, {
+      queueIds: queue.map((c) => c.id),
+      knownIds: known.map((c) => c.id),
+      shuffled,
+      done,
+    });
+  }, [queue, known, shuffled, done, id]);
+
+  function toggleShuffle() {
+    setQueue((q) => {
+      if (q.length <= 1) return q;
+      const [head, ...rest] = q;
+      if (shuffled) {
+        // turning shuffle off: restore remaining cards to original deck order
+        const restIds = new Set(rest.map((c) => c.id));
+        const ordered = originalOrder.filter((c) => restIds.has(c.id));
+        return [head, ...ordered];
+      }
+      return [head, ...shuffleArray(rest)];
+    });
+    setShuffled(!shuffled);
+  }
 
   const respond = useCallback(async (knewIt) => {
     const card = queue[0];
@@ -35,8 +85,12 @@ export default function LearnMode() {
       remaining.splice(pos, 0, card);
     }
     setRevealed(false);
-    if (remaining.length === 0) setDone(true);
-    else setQueue(remaining);
+    if (remaining.length === 0) {
+      setDone(true);
+      clearSession('learn', id);
+    } else {
+      setQueue(remaining);
+    }
   }, [queue, id]);
 
   // Keyboard shortcuts: Space to reveal, 1 = still learning, 2 = got it
@@ -63,7 +117,12 @@ export default function LearnMode() {
           <div className="flex gap-3 mt-6">
             <button onClick={() => navigate(`/decks/${id}`)} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm">Back to Deck</button>
             <button
-              onClick={() => { setQueue([...known].sort(() => Math.random() - 0.5)); setKnown([]); setDone(false); setRevealed(false); }}
+              onClick={() => {
+                setQueue(shuffled ? shuffleArray(known) : originalOrder.filter((c) => known.some((k) => k.id === c.id)));
+                setKnown([]);
+                setDone(false);
+                setRevealed(false);
+              }}
               className="flex-1 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 text-sm font-medium"
             >Study Again</button>
           </div>
@@ -81,7 +140,19 @@ export default function LearnMode() {
         <div className="flex items-center justify-between mb-6">
           <button onClick={() => navigate(`/decks/${id}`)} className="text-sm text-indigo-500 hover:underline">← Back</button>
           <h2 className="font-semibold text-gray-700 dark:text-gray-200">{deckName} — Learn</h2>
-          <span className="text-sm text-gray-400 dark:text-gray-500">{known.length}/{totalCards} known</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-400 dark:text-gray-500">{known.length}/{totalCards} known</span>
+            <button
+              onClick={toggleShuffle}
+              className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
+                shuffled
+                  ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
+                  : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              Shuffle
+            </button>
+          </div>
         </div>
 
         <div className="mb-4">

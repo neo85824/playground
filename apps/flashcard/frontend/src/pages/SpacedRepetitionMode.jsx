@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getDeck, getDueCards, reviewCard } from '../api';
 import FlipCard from '../components/Card/FlipCard';
 import ProgressBar from '../components/Shared/ProgressBar';
+import { shuffleArray } from '../lib/shuffle';
+import { loadSession, saveSession, clearSession } from '../lib/sessionStorage';
 
 const GRADES = [
   { quality: 1, label: 'Again',  sub: 'Forgot',       cls: 'border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' },
@@ -21,14 +23,61 @@ export default function SpacedRepetitionMode() {
   const [done, setDone] = useState(false);
   const [total, setTotal] = useState(0);
   const [lastNext, setLastNext] = useState(null);
+  const [shuffled, setShuffled] = useState(false);
+  const restored = useRef(false);
+  const allCardsRef = useRef([]);
 
   useEffect(() => {
     Promise.all([getDeck(id), getDueCards(id)]).then(([deck, due]) => {
       setDeckName(deck.name);
-      setQueue(due);
-      setTotal(due.length);
+      allCardsRef.current = deck.cards;
+
+      const session = loadSession('spaced-repetition', id);
+      const byId = new Map(deck.cards.map((c) => [c.id, c]));
+      const queueIds = session?.queueIds;
+      const reviewedEntries = session?.reviewed;
+      const canRestore = !session?.done
+        && Array.isArray(queueIds) && queueIds.length > 0
+        && queueIds.every((cardId) => byId.has(cardId))
+        && Array.isArray(reviewedEntries)
+        && reviewedEntries.every((r) => byId.has(r.id));
+
+      if (canRestore) {
+        setQueue(queueIds.map((cardId) => byId.get(cardId)));
+        setReviewed(reviewedEntries.map((r) => ({ ...byId.get(r.id), quality: r.quality })));
+        setTotal(queueIds.length + reviewedEntries.length);
+        setShuffled(!!session.shuffled);
+      } else {
+        setQueue(due);
+        setTotal(due.length);
+      }
+      restored.current = true;
     });
   }, [id]);
+
+  useEffect(() => {
+    if (!restored.current) return;
+    saveSession('spaced-repetition', id, {
+      queueIds: queue.map((c) => c.id),
+      reviewed: reviewed.map((r) => ({ id: r.id, quality: r.quality })),
+      shuffled,
+      done,
+    });
+  }, [queue, reviewed, shuffled, done, id]);
+
+  function toggleShuffle() {
+    setQueue((q) => {
+      if (q.length <= 1) return q;
+      const [head, ...rest] = q;
+      if (shuffled) {
+        const restIds = new Set(rest.map((c) => c.id));
+        const ordered = allCardsRef.current.filter((c) => restIds.has(c.id));
+        return [head, ...ordered];
+      }
+      return [head, ...shuffleArray(rest)];
+    });
+    setShuffled(!shuffled);
+  }
 
   const grade = useCallback(async (quality) => {
     const card = queue[0];
@@ -39,9 +88,13 @@ export default function SpacedRepetitionMode() {
     // For quality < 3 (fail), requeue at end so user sees it again this session
     if (quality < 3) remaining.push(card);
     setRevealed(false);
-    if (remaining.length === 0) setDone(true);
-    else setQueue(remaining);
-  }, [queue]);
+    if (remaining.length === 0) {
+      setDone(true);
+      clearSession('spaced-repetition', id);
+    } else {
+      setQueue(remaining);
+    }
+  }, [queue, id]);
 
   useEffect(() => {
     function onKey(e) {
@@ -96,7 +149,19 @@ export default function SpacedRepetitionMode() {
         <div className="flex items-center justify-between mb-6">
           <button onClick={() => navigate(`/decks/${id}`)} className="text-sm text-indigo-500 hover:underline">← Back</button>
           <h2 className="font-semibold text-gray-700 dark:text-gray-200">{deckName} — Spaced Rep</h2>
-          <span className="text-sm text-gray-400 dark:text-gray-500">{progress}/{total} done</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-400 dark:text-gray-500">{progress}/{total} done</span>
+            <button
+              onClick={toggleShuffle}
+              className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
+                shuffled
+                  ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
+                  : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              Shuffle
+            </button>
+          </div>
         </div>
 
         <div className="mb-4">

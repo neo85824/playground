@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getDeck } from '../api';
 import FlipCard from '../components/Card/FlipCard';
 import ProgressBar from '../components/Shared/ProgressBar';
+import { shuffleArray } from '../lib/shuffle';
+import { loadSession, saveSession } from '../lib/sessionStorage';
 
 export default function CardMode() {
   const { id } = useParams();
@@ -12,14 +14,40 @@ export default function CardMode() {
   const [index, setIndex] = useState(0);
   const [shuffled, setShuffled] = useState(false);
   const [order, setOrder] = useState([]);
+  const restored = useRef(false);
 
   useEffect(() => {
     getDeck(id).then((data) => {
       setDeckName(data.name);
       setCards(data.cards);
-      setOrder(data.cards.map((_, i) => i));
+
+      const session = loadSession('card', id);
+      const validIds = new Set(data.cards.map((c) => c.id));
+      const savedOrderIds = session?.orderIds;
+      const canRestore = Array.isArray(savedOrderIds)
+        && savedOrderIds.length === data.cards.length
+        && savedOrderIds.every((cardId) => validIds.has(cardId));
+
+      if (canRestore) {
+        const idToIndex = new Map(data.cards.map((c, i) => [c.id, i]));
+        setOrder(savedOrderIds.map((cardId) => idToIndex.get(cardId)));
+        setIndex(Math.min(session.index ?? 0, savedOrderIds.length - 1));
+        setShuffled(!!session.shuffled);
+      } else {
+        setOrder(data.cards.map((_, i) => i));
+      }
+      restored.current = true;
     });
   }, [id]);
+
+  useEffect(() => {
+    if (!restored.current || !order.length) return;
+    saveSession('card', id, {
+      orderIds: order.map((i) => cards[i]?.id).filter((v) => v !== undefined),
+      index,
+      shuffled,
+    });
+  }, [order, index, shuffled, cards, id]);
 
   const handleKey = useCallback((e) => {
     if (e.key === 'ArrowRight') setIndex((i) => Math.min(i + 1, order.length - 1));
@@ -35,12 +63,7 @@ export default function CardMode() {
     if (shuffled) {
       setOrder(cards.map((_, i) => i));
     } else {
-      const arr = cards.map((_, i) => i);
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-      setOrder(arr);
+      setOrder(shuffleArray(cards.map((_, i) => i)));
     }
     setShuffled(!shuffled);
     setIndex(0);

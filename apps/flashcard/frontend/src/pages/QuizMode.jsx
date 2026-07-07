@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getDeck, saveQuizResult } from '../api';
 import ProgressBar from '../components/Shared/ProgressBar';
+import { shuffleArray } from '../lib/shuffle';
+import { loadSession, saveSession, clearSession } from '../lib/sessionStorage';
 
 function levenshtein(a, b) {
   const dp = Array.from({ length: a.length + 1 }, (_, i) =>
@@ -17,8 +19,8 @@ function levenshtein(a, b) {
 
 function getChoices(cards, correctCard) {
   const others = cards.filter((c) => c.id !== correctCard.id);
-  const shuffled = others.sort(() => Math.random() - 0.5).slice(0, 3);
-  return [...shuffled, correctCard].sort(() => Math.random() - 0.5);
+  const picked = shuffleArray(others).slice(0, 3);
+  return shuffleArray([...picked, correctCard]);
 }
 
 export default function QuizMode() {
@@ -37,18 +39,47 @@ export default function QuizMode() {
   const [missed, setMissed] = useState([]);
   const [done, setDone] = useState(false);
   const [startTime] = useState(Date.now());
+  const [shuffled, setShuffled] = useState(true);
+  const [resumable, setResumable] = useState(null);
   const typedRef = useRef();
+  const restored = useRef(false);
 
   useEffect(() => {
     getDeck(id).then((data) => {
       setDeckName(data.name);
       setAllCards(data.cards);
+
+      const session = loadSession('quiz', id);
+      const byId = new Map(data.cards.map((c) => [c.id, c]));
+      const questionIds = session?.questionIds;
+      const missedIds = session?.missedIds;
+      const canResume = !session?.done
+        && Array.isArray(questionIds) && questionIds.length > 0
+        && questionIds.every((cardId) => byId.has(cardId))
+        && Array.isArray(missedIds) && missedIds.every((cardId) => byId.has(cardId))
+        && typeof session.qIndex === 'number' && session.qIndex < questionIds.length;
+
+      setResumable(canResume ? session : null);
+      restored.current = true;
     });
   }, [id]);
 
+  useEffect(() => {
+    if (!restored.current || !mode) return;
+    saveSession('quiz', id, {
+      mode,
+      questionIds: questions.map((c) => c.id),
+      qIndex,
+      score,
+      missedIds: missed.map((c) => c.id),
+      shuffled,
+      done,
+    });
+  }, [mode, questions, qIndex, score, missed, shuffled, done, id]);
+
   function startQuiz(selectedMode) {
-    const shuffled = [...allCards].sort(() => Math.random() - 0.5);
-    setQuestions(shuffled);
+    clearSession('quiz', id);
+    setQuestions(shuffled ? shuffleArray(allCards) : allCards);
     setMode(selectedMode);
     setQIndex(0);
     setScore(0);
@@ -57,6 +88,24 @@ export default function QuizMode() {
     setAnswered(false);
     setSelected(null);
     setTypedAnswer('');
+    setResumable(null);
+  }
+
+  function resumeQuiz() {
+    if (!resumable) return;
+    const byId = new Map(allCards.map((c) => [c.id, c]));
+    setQuestions(resumable.questionIds.map((cardId) => byId.get(cardId)));
+    setMode(resumable.mode);
+    setQIndex(resumable.qIndex);
+    setScore(resumable.score);
+    setMissed(resumable.missedIds.map((cardId) => byId.get(cardId)));
+    setShuffled(!!resumable.shuffled);
+    setDone(false);
+    setAnswered(false);
+    setSelected(null);
+    setTypedAnswer('');
+    setCorrect(null);
+    setResumable(null);
   }
 
   function handleMCAnswer(choice) {
@@ -100,7 +149,14 @@ export default function QuizMode() {
     const finalScore = answered && correct ? score + 1 : score;
     await saveQuizResult({ deck_id: Number(id), score: finalScore, total: questions.length, mode });
     setDone(true);
+    clearSession('quiz', id);
   }
+
+  const card = questions[qIndex];
+  const choices = useMemo(() => {
+    if (mode !== 'multiple_choice' || !card) return [];
+    return getChoices(allCards, card);
+  }, [mode, allCards, card]);
 
   if (!mode) {
     return (
@@ -108,8 +164,24 @@ export default function QuizMode() {
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg p-10 text-center max-w-sm w-full">
           <button onClick={() => navigate(`/decks/${id}`)} className="text-sm text-indigo-500 hover:underline mb-6 block">← Back</button>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">{deckName}</h2>
-          <p className="text-gray-400 dark:text-gray-500 mb-8 text-sm">Choose quiz mode</p>
+          <p className="text-gray-400 dark:text-gray-500 mb-4 text-sm">Choose quiz mode</p>
+          <button
+            onClick={() => setShuffled((s) => !s)}
+            className={`text-sm px-3 py-1 rounded-lg border transition-colors mb-6 ${
+              shuffled
+                ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
+                : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}
+          >
+            Shuffle {shuffled ? 'on' : 'off'}
+          </button>
           <div className="space-y-3">
+            {resumable && (
+              <button onClick={resumeQuiz} className="w-full py-4 rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all text-left px-5">
+                <div className="font-semibold text-emerald-700 dark:text-emerald-400">Continue Quiz</div>
+                <div className="text-sm text-emerald-500 dark:text-emerald-500 mt-0.5">Resume at question {resumable.qIndex + 1} of {resumable.questionIds.length}</div>
+              </button>
+            )}
             <button onClick={() => startQuiz('multiple_choice')} className="w-full py-4 rounded-2xl border-2 border-indigo-100 dark:border-indigo-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all text-left px-5">
               <div className="font-semibold text-gray-700 dark:text-gray-200">Multiple Choice</div>
               <div className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">Pick the correct translation</div>
@@ -157,9 +229,6 @@ export default function QuizMode() {
       </div>
     );
   }
-
-  const card = questions[qIndex];
-  const choices = mode === 'multiple_choice' ? getChoices(allCards, card) : [];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center py-10 px-4">
