@@ -25,13 +25,20 @@ function sm2(quality, repetitions, easeFactor, intervalDays) {
 }
 
 router.put('/:id', (req, res) => {
-  const { word, translation, position } = req.body;
+  const { word, translation, position, ease_factor, interval_days, repetitions, due_date } = req.body;
   const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id);
   if (!card) return res.status(404).json({ error: 'card not found' });
-  db.prepare('UPDATE cards SET word = ?, translation = ?, position = ? WHERE id = ?').run(
+  db.prepare(`UPDATE cards SET
+      word = ?, translation = ?, position = ?,
+      ease_factor = ?, interval_days = ?, repetitions = ?, due_date = ?
+    WHERE id = ?`).run(
     word ?? card.word,
     translation ?? card.translation,
     position !== undefined ? position : card.position,
+    ease_factor !== undefined ? ease_factor : card.ease_factor,
+    interval_days !== undefined ? interval_days : card.interval_days,
+    repetitions !== undefined ? repetitions : card.repetitions,
+    due_date !== undefined ? due_date : card.due_date,
     req.params.id
   );
   res.json(db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id));

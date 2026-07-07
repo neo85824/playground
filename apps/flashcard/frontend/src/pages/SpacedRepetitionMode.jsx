@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getDeck, getDueCards, reviewCard } from '../api';
+import { getDeck, getDueCards, reviewCard, updateCard } from '../api';
 import FlipCard from '../components/Card/FlipCard';
 import ProgressBar from '../components/Shared/ProgressBar';
 import { shuffleArray } from '../lib/shuffle';
@@ -43,8 +43,10 @@ export default function SpacedRepetitionMode() {
         && reviewedEntries.every((r) => byId.has(r.id));
 
       if (canRestore) {
+        // queue cards can safely use fresh data (not yet graded this session);
+        // reviewed cards must keep their stored pre-grade snapshot so Undo stays correct after a resume
         setQueue(queueIds.map((cardId) => byId.get(cardId)));
-        setReviewed(reviewedEntries.map((r) => ({ ...byId.get(r.id), quality: r.quality })));
+        setReviewed(reviewedEntries.map((r) => ({ ...r })));
         setTotal(queueIds.length + reviewedEntries.length);
         setShuffled(!!session.shuffled);
       } else {
@@ -59,7 +61,16 @@ export default function SpacedRepetitionMode() {
     if (!restored.current) return;
     saveSession('spaced-repetition', id, {
       queueIds: queue.map((c) => c.id),
-      reviewed: reviewed.map((r) => ({ id: r.id, quality: r.quality })),
+      reviewed: reviewed.map((r) => ({
+        id: r.id,
+        word: r.word,
+        translation: r.translation,
+        quality: r.quality,
+        ease_factor: r.ease_factor,
+        interval_days: r.interval_days,
+        repetitions: r.repetitions,
+        due_date: r.due_date,
+      })),
       shuffled,
       done,
     });
@@ -95,6 +106,52 @@ export default function SpacedRepetitionMode() {
       setQueue(remaining);
     }
   }, [queue, id]);
+
+  // Reverts one graded card back to its pre-grade SM-2 state (server + local queue/reviewed arrays).
+  async function undoOne(currentQueue, currentReviewed) {
+    const last = currentReviewed[currentReviewed.length - 1];
+    const priorState = {
+      id: last.id,
+      word: last.word,
+      translation: last.translation,
+      ease_factor: last.ease_factor,
+      interval_days: last.interval_days,
+      repetitions: last.repetitions,
+      due_date: last.due_date,
+    };
+    await updateCard(last.id, {
+      ease_factor: priorState.ease_factor,
+      interval_days: priorState.interval_days,
+      repetitions: priorState.repetitions,
+      due_date: priorState.due_date,
+    });
+    return {
+      queue: [priorState, ...currentQueue.filter((c) => c.id !== last.id)],
+      reviewed: currentReviewed.slice(0, -1),
+    };
+  }
+
+  async function goBack() {
+    if (reviewed.length === 0) return;
+    const { queue: newQueue, reviewed: newReviewed } = await undoOne(queue, reviewed);
+    setQueue(newQueue);
+    setReviewed(newReviewed);
+    setRevealed(false);
+    setDone(false);
+  }
+
+  async function restartSession() {
+    if (reviewed.length === 0) return;
+    let q = queue;
+    let r = reviewed;
+    while (r.length > 0) {
+      ({ queue: q, reviewed: r } = await undoOne(q, r));
+    }
+    setQueue(q);
+    setReviewed(r);
+    setRevealed(false);
+    setDone(false);
+  }
 
   useEffect(() => {
     function onKey(e) {
@@ -134,7 +191,10 @@ export default function SpacedRepetitionMode() {
             <strong className="text-emerald-600">{passed}</strong> / {total} cards passed
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500">Cards are scheduled for future review based on your ratings.</p>
-          <button onClick={() => navigate(`/decks/${id}`)} className="mt-6 w-full py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 text-sm font-medium">Back to Deck</button>
+          <div className="flex gap-3 mt-6">
+            <button onClick={() => navigate(`/decks/${id}`)} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm">Back to Deck</button>
+            <button onClick={goBack} className="flex-1 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 text-sm font-medium">↩ Undo Last</button>
+          </div>
         </div>
       </div>
     );
@@ -151,6 +211,20 @@ export default function SpacedRepetitionMode() {
           <h2 className="font-semibold text-gray-700 dark:text-gray-200">{deckName} — Spaced Rep</h2>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-400 dark:text-gray-500">{progress}/{total} done</span>
+            <button
+              onClick={goBack}
+              disabled={reviewed.length === 0}
+              className="text-sm px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              ↩ Undo
+            </button>
+            <button
+              onClick={restartSession}
+              disabled={reviewed.length === 0}
+              className="text-sm px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              ↺ Restart
+            </button>
             <button
               onClick={toggleShuffle}
               className={`text-sm px-3 py-1 rounded-lg border transition-colors ${

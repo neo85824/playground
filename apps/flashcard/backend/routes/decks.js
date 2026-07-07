@@ -68,9 +68,14 @@ router.get('/:id/cards', (req, res) => {
 router.post('/:id/cards', (req, res) => {
   const { word, translation, position } = req.body;
   if (!word || !translation) return res.status(400).json({ error: 'word and translation required' });
+  let pos = position;
+  if (pos === undefined) {
+    pos = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next FROM cards WHERE deck_id = ?')
+      .get(req.params.id).next;
+  }
   const result = db.prepare(
     'INSERT INTO cards (deck_id, word, translation, position) VALUES (?, ?, ?, ?)'
-  ).run(req.params.id, word, translation, position ?? 0);
+  ).run(req.params.id, word, translation, pos);
   res.status(201).json(db.prepare('SELECT * FROM cards WHERE id = ?').get(result.lastInsertRowid));
 });
 
@@ -96,11 +101,13 @@ router.post('/:id/import', upload.single('file'), (req, res) => {
       fs.unlinkSync(req.file.path);
       if (rows.length === 0) return res.json({ imported: 0, skipped: 0 });
 
-      const insert = db.prepare('INSERT INTO cards (deck_id, word, translation) VALUES (?, ?, ?)');
-      const insertMany = db.transaction((items) => {
-        for (const item of items) insert.run(deckId, item.word, item.translation);
+      const insert = db.prepare('INSERT INTO cards (deck_id, word, translation, position) VALUES (?, ?, ?, ?)');
+      const insertMany = db.transaction((items, startPos) => {
+        items.forEach((item, i) => insert.run(deckId, item.word, item.translation, startPos + i));
       });
-      insertMany(rows);
+      const startPos = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next FROM cards WHERE deck_id = ?')
+        .get(deckId).next;
+      insertMany(rows, startPos);
       res.json({ imported: rows.length, skipped: 0 });
     })
     .on('error', (err) => {
