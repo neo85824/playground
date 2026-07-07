@@ -300,9 +300,6 @@ export default function DeckView() {
                     <>
                       <span className="flex-1 text-sm text-gray-700 dark:text-gray-200">{card.word}</span>
                       <span className="flex-1 text-sm text-gray-500 dark:text-gray-400">{card.translation}</span>
-                      {card.due_date && (
-                        <span className="text-xs text-gray-300 dark:text-gray-600 hidden sm:block">due {card.due_date}</span>
-                      )}
                       {!bulkMode && (
                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => { setEditCardId(card.id); setEditWord(card.word); setEditTranslation(card.translation); }} className="text-xs text-gray-400 hover:text-indigo-500 py-1">Edit</button>
