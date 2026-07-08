@@ -13,6 +13,7 @@ export default function CardMode() {
   const [deckName, setDeckName] = useState('');
   const [index, setIndex] = useState(0);
   const [shuffled, setShuffled] = useState(false);
+  const [reversed, setReversed] = useState(false);
   const [order, setOrder] = useState([]);
   const restored = useRef(false);
 
@@ -33,6 +34,7 @@ export default function CardMode() {
         setOrder(savedOrderIds.map((cardId) => idToIndex.get(cardId)));
         setIndex(Math.min(session.index ?? 0, savedOrderIds.length - 1));
         setShuffled(!!session.shuffled);
+        setReversed(!!session.reversed);
       } else {
         setOrder(data.cards.map((_, i) => i));
       }
@@ -46,8 +48,9 @@ export default function CardMode() {
       orderIds: order.map((i) => cards[i]?.id).filter((v) => v !== undefined),
       index,
       shuffled,
+      reversed,
     });
-  }, [order, index, shuffled, cards, id]);
+  }, [order, index, shuffled, reversed, cards, id]);
 
   const handleKey = useCallback((e) => {
     if (e.key === 'ArrowRight') setIndex((i) => Math.min(i + 1, order.length - 1));
@@ -79,16 +82,28 @@ export default function CardMode() {
         <div className="flex items-center justify-between mb-6">
           <button onClick={() => navigate(`/decks/${id}`)} className="text-sm text-indigo-500 hover:underline">← Back</button>
           <h2 className="font-semibold text-gray-700 dark:text-gray-200">{deckName}</h2>
-          <button
-            onClick={toggleShuffle}
-            className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
-              shuffled
-                ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
-                : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-            }`}
-          >
-            Shuffle
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setReversed((r) => !r)}
+              className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
+                reversed
+                  ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
+                  : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              {reversed ? 'B→A' : 'A→B'}
+            </button>
+            <button
+              onClick={toggleShuffle}
+              className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
+                shuffled
+                  ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
+                  : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              Shuffle
+            </button>
+          </div>
         </div>
 
         <div className="mb-4">
@@ -96,7 +111,11 @@ export default function CardMode() {
           <p className="text-center text-sm text-gray-400 dark:text-gray-500 mt-2">Card {index + 1} of {order.length}</p>
         </div>
 
-        <FlipCard key={`${order[index]}-${index}`} word={card.word} translation={card.translation} />
+        <FlipCard
+          key={`${order[index]}-${index}`}
+          word={reversed ? card.translation : card.word}
+          translation={reversed ? card.word : card.translation}
+        />
 
         <div className="flex items-center justify-center gap-4 mt-6">
           <button

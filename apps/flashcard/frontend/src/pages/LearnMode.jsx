@@ -16,6 +16,7 @@ export default function LearnMode() {
   const [done, setDone] = useState(false);
   const [totalCards, setTotalCards] = useState(0);
   const [shuffled, setShuffled] = useState(true);
+  const [reversed, setReversed] = useState(false);
   const [originalOrder, setOriginalOrder] = useState([]);
   const restored = useRef(false);
 
@@ -39,6 +40,7 @@ export default function LearnMode() {
         setQueue(queueIds.map((cardId) => byId.get(cardId)));
         setKnown(knownIds.map((cardId) => byId.get(cardId)));
         setShuffled(!!session.shuffled);
+        setReversed(!!session.reversed);
       } else {
         setQueue(shuffleArray(data.cards));
         setKnown([]);
@@ -54,9 +56,10 @@ export default function LearnMode() {
       queueIds: queue.map((c) => c.id),
       knownIds: known.map((c) => c.id),
       shuffled,
+      reversed,
       done,
     });
-  }, [queue, known, shuffled, done, id]);
+  }, [queue, known, shuffled, reversed, done, id]);
 
   function toggleShuffle() {
     setQueue((q) => {
@@ -143,6 +146,16 @@ export default function LearnMode() {
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-400 dark:text-gray-500">{known.length}/{totalCards} known</span>
             <button
+              onClick={() => setReversed((r) => !r)}
+              className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
+                reversed
+                  ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
+                  : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              {reversed ? 'B→A' : 'A→B'}
+            </button>
+            <button
               onClick={toggleShuffle}
               className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
                 shuffled
@@ -162,8 +175,8 @@ export default function LearnMode() {
 
         <FlipCard
           key={card.id}
-          word={card.word}
-          translation={card.translation}
+          word={reversed ? card.translation : card.word}
+          translation={reversed ? card.word : card.translation}
           forceFlipped={revealed}
           onClick={(isFlipped) => setRevealed(isFlipped)}
         />

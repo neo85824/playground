@@ -40,6 +40,7 @@ export default function QuizMode() {
   const [done, setDone] = useState(false);
   const [startTime] = useState(Date.now());
   const [shuffled, setShuffled] = useState(true);
+  const [reversed, setReversed] = useState(false);
   const [resumable, setResumable] = useState(null);
   const typedRef = useRef();
   const restored = useRef(false);
@@ -73,9 +74,10 @@ export default function QuizMode() {
       score,
       missedIds: missed.map((c) => c.id),
       shuffled,
+      reversed,
       done,
     });
-  }, [mode, questions, qIndex, score, missed, shuffled, done, id]);
+  }, [mode, questions, qIndex, score, missed, shuffled, reversed, done, id]);
 
   function startQuiz(selectedMode) {
     clearSession('quiz', id);
@@ -100,6 +102,7 @@ export default function QuizMode() {
     setScore(resumable.score);
     setMissed(resumable.missedIds.map((cardId) => byId.get(cardId)));
     setShuffled(!!resumable.shuffled);
+    setReversed(!!resumable.reversed);
     setDone(false);
     setAnswered(false);
     setSelected(null);
@@ -123,7 +126,7 @@ export default function QuizMode() {
     e.preventDefault();
     if (answered) return;
     const input = typedAnswer.trim().toLowerCase();
-    const target = questions[qIndex].translation.trim().toLowerCase();
+    const target = (reversed ? questions[qIndex].word : questions[qIndex].translation).trim().toLowerCase();
     const isCorrect = levenshtein(input, target) <= 2;
     setAnswered(true);
     setCorrect(isCorrect);
@@ -165,16 +168,28 @@ export default function QuizMode() {
           <button onClick={() => navigate(`/decks/${id}`)} className="text-sm text-indigo-500 hover:underline mb-6 block">← Back</button>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">{deckName}</h2>
           <p className="text-gray-400 dark:text-gray-500 mb-4 text-sm">Choose quiz mode</p>
-          <button
-            onClick={() => setShuffled((s) => !s)}
-            className={`text-sm px-3 py-1 rounded-lg border transition-colors mb-6 ${
-              shuffled
-                ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
-                : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-            }`}
-          >
-            Shuffle {shuffled ? 'on' : 'off'}
-          </button>
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <button
+              onClick={() => setReversed((r) => !r)}
+              className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
+                reversed
+                  ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
+                  : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              {reversed ? 'B→A' : 'A→B'}
+            </button>
+            <button
+              onClick={() => setShuffled((s) => !s)}
+              className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
+                shuffled
+                  ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
+                  : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              Shuffle {shuffled ? 'on' : 'off'}
+            </button>
+          </div>
           <div className="space-y-3">
             {resumable && (
               <button onClick={resumeQuiz} className="w-full py-4 rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all text-left px-5">
@@ -246,7 +261,7 @@ export default function QuizMode() {
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 mb-6 text-center">
           <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Translate</p>
-          <p className="text-3xl font-bold text-gray-800 dark:text-gray-100">{card.word}</p>
+          <p className="text-3xl font-bold text-gray-800 dark:text-gray-100">{reversed ? card.translation : card.word}</p>
         </div>
 
         {mode === 'multiple_choice' && (
@@ -264,7 +279,7 @@ export default function QuizMode() {
               }
               return (
                 <button key={choice.id} onClick={() => handleMCAnswer(choice)} className={cls} disabled={answered}>
-                  {choice.translation}
+                  {reversed ? choice.word : choice.translation}
                 </button>
               );
             })}
@@ -290,7 +305,7 @@ export default function QuizMode() {
             />
             {answered && (
               <div className={`text-center text-sm font-medium ${correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-                {correct ? '✓ Correct!' : `✗ Answer: ${card.translation}`}
+                {correct ? '✓ Correct!' : `✗ Answer: ${reversed ? card.word : card.translation}`}
               </div>
             )}
             {!answered && (

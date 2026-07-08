@@ -24,6 +24,7 @@ export default function SpacedRepetitionMode() {
   const [total, setTotal] = useState(0);
   const [lastNext, setLastNext] = useState(null);
   const [shuffled, setShuffled] = useState(false);
+  const [reversed, setReversed] = useState(false);
   const restored = useRef(false);
   const allCardsRef = useRef([]);
 
@@ -49,6 +50,7 @@ export default function SpacedRepetitionMode() {
         setReviewed(reviewedEntries.map((r) => ({ ...r })));
         setTotal(queueIds.length + reviewedEntries.length);
         setShuffled(!!session.shuffled);
+        setReversed(!!session.reversed);
       } else {
         setQueue(due);
         setTotal(due.length);
@@ -72,9 +74,10 @@ export default function SpacedRepetitionMode() {
         due_date: r.due_date,
       })),
       shuffled,
+      reversed,
       done,
     });
-  }, [queue, reviewed, shuffled, done, id]);
+  }, [queue, reviewed, shuffled, reversed, done, id]);
 
   function toggleShuffle() {
     setQueue((q) => {
@@ -226,6 +229,16 @@ export default function SpacedRepetitionMode() {
               ↺ Restart
             </button>
             <button
+              onClick={() => setReversed((r) => !r)}
+              className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
+                reversed
+                  ? 'bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300'
+                  : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              {reversed ? 'B→A' : 'A→B'}
+            </button>
+            <button
               onClick={toggleShuffle}
               className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
                 shuffled
@@ -251,8 +264,8 @@ export default function SpacedRepetitionMode() {
 
         <FlipCard
           key={card.id}
-          word={card.word}
-          translation={card.translation}
+          word={reversed ? card.translation : card.word}
+          translation={reversed ? card.word : card.translation}
           forceFlipped={revealed}
           onClick={(isFlipped) => setRevealed(isFlipped)}
         />
