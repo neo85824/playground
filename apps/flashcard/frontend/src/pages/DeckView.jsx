@@ -9,12 +9,20 @@ function PasteImportModal({ deckId, onClose, onImported }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
+  function stripQuotes(field) {
+    const trimmed = (field || '').trim();
+    if (trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      return trimmed.slice(1, -1).replace(/""/g, '"');
+    }
+    return trimmed;
+  }
+
   function parsePairs(raw) {
     return raw.split('\n')
       .map(line => {
         const parts = line.includes('\t') ? line.split('\t') : line.split(',');
-        const word = (parts[0] || '').trim();
-        const translation = (parts[1] || '').trim();
+        const word = stripQuotes(parts[0]);
+        const translation = stripQuotes(parts[1]);
         return word && translation ? { word, translation } : null;
       })
       .filter(Boolean);
